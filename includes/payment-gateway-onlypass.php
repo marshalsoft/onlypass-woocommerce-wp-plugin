@@ -27,7 +27,7 @@ class WC_Gateway_OnlyPass extends WC_Payment_Gateway {
         global $currency;
         global $isLive;
         global $baseURL;
-        $env = "test";
+        $env = "live";
         $apikey = $this->get_option('api_key');
         $merchantId = $this->get_option('merchent_id');
         $gateways =  $this->get_option('onlypass_gateways');
