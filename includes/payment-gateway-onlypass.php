@@ -39,7 +39,10 @@ class WC_Gateway_OnlyPass extends WC_Payment_Gateway {
         {
             $baseURL = str_replace("api.","devapi.",$baseURL);
         }
-
+        if(empty($currency))
+        {
+            $currency = "NGN";
+        }
         if((isset($_POST["woocommerce_onlypass_api_key"]) && empty($_POST["woocommerce_onlypass_api_key"])) || (isset($_POST["woocommerce_onlypass_merchent_id"]) && empty($_POST["woocommerce_onlypass_merchent_id"]))) {
             if($apikey !== null) {
                 $this->update_option('api_key', '');
