@@ -1,5 +1,4 @@
 <?php
-session_start();
 add_filter( 'woocommerce_gateway_description', 'onlypass_description_fields', 20, 2 );
 add_action( 'woocommerce_checkout_process', 'onlypass_form_processing' );
 add_action( 'woocommerce_checkout_update_order_meta', 'onlypass_checkout_update_order_meta', 10, 1 );
@@ -38,9 +37,10 @@ function onlypass_description_fields( $description, $payment_id ) {
 //    echo '<br/>';
         //  echo "SESSION ".$_SESSION["payInit"];
         $isDemo = get_option('onlypass_merchent_id');
-        if(isset($gateways)  && 'onlypass' == $payment_id ) {
+        if(isset($gateways) && strlen($gateways) != 0 && 'onlypass' == $payment_id ) {
          $r = hex2bin($gateways);
-//         var_dump($r);
+        // var_dump($gateways);
+// return;
          $total = intval($woocommerce->cart->total);
          echo '<style>.woocommerce-error{display: none;}</style>';
          echo '<div class="card" style="display: inline-flex; width:279px; height:auto;padding:10px;">
@@ -50,7 +50,7 @@ function onlypass_description_fields( $description, $payment_id ) {
          <input name="firstCall" id="firstCall" value="1" type="hidden" />
          <input name="totalAmount" value="' .$total.'" type="hidden" />
         <input name="currencyType" value="' .$currency. '" type="hidden" />
-        <input name="env" value="' .$env. '" type="hidden" />';
+        <input name="env" value="'.$env.'" type="hidden" />';
          $list = json_decode($r);
          echo '<div >';
          if(count($list) != 0) {
@@ -72,13 +72,13 @@ echo '<div>
                 var name = "";
                 var channels = "";
                 var channels_count = 0;
-                jQuery.each(obj.gateway.channels,(i,ch)=>{
+                jQuery.each(obj.gateway.modes,(i,ch)=>{
                     channels += `<li style="display: flex;
                     align-content: center;
                     align-items: center;
                     justify-content:flex-start;
                     padding: 5px 0px;">
-                    <input class="payment_channel" required name="payment_channel" value="${ch.channel}" type="radio" style="outline: 0px;border: 0px;width: 20px;height: 20px;cursor: pointer;" />
+                    <input class="payment_channel" required name="payment_channel" value="${convertBinaryToHex(Object.assign(obj,ch))}" type="radio" style="outline: 0px;border: 0px;width: 20px;height: 20px;cursor: pointer;" />
                     <span style="margin-left:5px;">${ch.description}</span></li>`;
                     channels_count += 1;
                 })

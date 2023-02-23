@@ -1,10 +1,10 @@
 <?php
 
 /**
- * Plugin Name: OnlyPass Woocommerce Plugin
+ * Plugin Name: OnlyPass WooPayment
  * Plugin URI: https://onlypass.africa
  * Author Name: Marshall Ekene
- * Author URI: http://onlypass.africa
+ * Author URI: http://github.com/marshalsoft
  * Description: Bringing all your payment solutions under one roof.
  * Version: 1.0
  * License: 1.0
@@ -19,18 +19,10 @@ if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins',
 
 add_action( 'plugins_loaded', 'onlypass_payment_init', 11 );
 add_filter( 'woocommerce_payment_gateways', 'add_to_payment_gateway');
-//add_action('wp_enqueue_scripts','js_init');
 add_action('wp_head', 'add_stylesheet_to_head');
-function js_init()
-{
-//    wp_enqueue_script( 'banis', 'https://bani-assets.s3.eu-west-2.amazonaws.com/static/widget/js/window.js',  null, null, true );
-    wp_enqueue_script( 'baniJs',plugins_url('/includes/js/bani.js?v='.uniqid(), __FILE__ ));
-    wp_enqueue_script( 'paystack', 'https://js.paystack.co/v2/inline.js',  null, null, true );
-    wp_enqueue_script( 'flutterwave', 'https://checkout.flutterwave.com/v3.js',  null, null, true );
-    wp_enqueue_script( 'squad', 'https://checkout.squadco.com/widget/squad.min.js',  null, null, true );
-}
+
 function add_stylesheet_to_head() {
-    $path = plugins_url('/includes/js/bani.js?v='.uniqid(), __FILE__ );
+    $path = plugins_url('/assets/js/bani.js?v='.uniqid(), __FILE__ );
 //    echo "<style >.payment_method_onlypass > label{background: #212529 !important;color: transparent !important;display:none !important;} .payment_method_onlypass > label > img {float: left !important;display:none !important;} #payment_method_onlypass{opacity: 0} .payment_method_onlypass > label::before{content:'' !important;} </style>";
     echo '<script src="'.$path.'" ></script>';
     echo '<script src="https://js.paystack.co/v2/inline.js"></script>';
@@ -70,6 +62,16 @@ function generateRef()
         text += possible.charAt(Math.floor(Math.random() * possible.length));
     return text+tm;
 }
+function ShowError(d)
+{
+    const elm = jQuery('<div />');
+    elm.css({backgroundColor: "#ffdada",padding: "14px",color: "red",borderRadius: "5px"});
+    elm.html(d);
+    jQuery("#customer_details").prepend(elm);
+     setTimeout(()=>{
+     elm.remove();  
+    },4000)
+}
 function InitializePayment()
 {
   return new Promise((resolve)=>{
@@ -97,7 +99,7 @@ function InitializePayment()
                e.preventDefault();
                // alert(window.location.hash)
            jQuery(".woocommerce-error").show();
-                   var formObj = {PKey:""};
+                   var formObj = {};
                    var emptyInput = [];
                    var whitelist = ['billing_address_2', 'billing_postcode', 'shipping_address_2', 'shipping_postcode', 'order_comments','isLive'];
                    jQuery.each(form.serializeArray(), (i, d) => {
@@ -143,9 +145,9 @@ function InitializePayment()
                    {
                        // jQuery('form.checkout').submit();
                    }else if(formObj.payment_gateway_list == undefined) {
-                        alert("Oops! select one of payment gateways from OnyPass gateway list.");
+                    ShowError("Oops! select one of payment gateways from OnyPass gateway list.");
                     }else if(formObj.payment_channel == undefined && formObj.gatewayName != "bani") {
-                        alert("Oops! select one of payment channel.");
+                        ShowError("Oops! select one of payment channel.");
                    }else{
                            if (formObj.isLive == 1) {
                                formObj.PKey = formObj.payment_gateway_list.livePublicKey;
@@ -157,7 +159,8 @@ function InitializePayment()
 
                            if (emptyInput.length !== 0) {
                                // console.log("emptyInput", emptyInput)
-                               alert(`Oops! ${emptyInput[0].name} is a required field`);
+                            //    alert(`Oops! ${emptyInput[0].name} is a required field`);
+                               ShowError(`Oops! ${emptyInput[0].name} is a required field`);
                            } else if (formObj.firstCall == 1) {
                                //   return;
                                    if (formObj.env === "test")
@@ -166,7 +169,9 @@ function InitializePayment()
                                    }
                                jQuery(".woocommerce-error").hide();
                                InitializePayment().then((ref) => {
-                                   var settings = {
+                                const channelObj = convertHexToBinary(formObj.payment_channel);
+                                console.log(formObj,"|",channelObj);
+                                var settings = {
                                        "url": url,
                                        "method": "POST",
                                        "timeout": 0,
@@ -177,22 +182,30 @@ function InitializePayment()
                                            "x-platform-id": `${formObj.merchant_id}`
                                        },
                                        "data": JSON.stringify({
-                                           "gatewayId": formObj.gatewayId,
+                                           "gatewayId": parseInt(formObj.gatewayId),
                                            "externalReference": `${ref.extRef}`,
-                                           "amount": formObj.totalAmount,
-                                           "isDemo": formObj.isLive == 1 ? false : true
-                                       }),
+                                           "amount": parseFloat(formObj.totalAmount),
+                                           "isDemo": formObj.isLive == 1 ? false : true,
+                                           "channelIdentifier":channelObj.channelIdentifier,
+                                           "merchantPaymentGatewayId": parseInt(channelObj.merchantPaymentGatewayId),
+                                           "userEmail":formObj.billing_email
+                                       })
                                    };
 
-                                //    console.log("settings:", settings);
+                                //    return ;
                                    if (window.genRef.call == undefined) {
                                        jQuery.ajax(settings).done(function (res) {
                                            // return;
+                                          console.log(res);
                                            if (res.status) {
                                                window.genRef = Object.assign(res.data, window.genRef, {call: 1}, formObj);
                                                formObj = window.genRef;
                                                CallGateways(formObj);
+                                           }else{
+                                            ShowError(res.message);
                                            }
+                                       }).catch((e)=>{
+                                        ShowError(e.responseJSON.message);
                                        });
                                    } else {
                                        formObj = Object.assign(window.genRef, formObj);

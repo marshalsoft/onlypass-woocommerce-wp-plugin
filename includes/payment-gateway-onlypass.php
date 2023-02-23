@@ -21,6 +21,7 @@ class WC_Gateway_OnlyPass extends WC_Payment_Gateway {
         // Get settings.
         // call endpoin to verify apikey
         global $env;
+        global $loginError;
         global $apikey;
         global $merchantId;
         global $gateways;
@@ -33,7 +34,7 @@ class WC_Gateway_OnlyPass extends WC_Payment_Gateway {
         $gateways =  $this->get_option('onlypass_gateways');
         $currency =  $this->get_option('onlypass_currency_type');
         $isLive =  $this->get_option('onlypass_isLive');
-        $baseURL = "https://api.onlypassafrica.com/api/v1/external/payments";
+        $baseURL = "https://".($env == "test"?"devapi":"api").".onlypassafrica.com/api/v1/external/payments";
 //        echo ;
         if($env == "test")
         {
@@ -54,18 +55,14 @@ class WC_Gateway_OnlyPass extends WC_Payment_Gateway {
             $apikey = trim($_POST["woocommerce_onlypass_api_key"]);
             $merchantId = trim($_POST["woocommerce_onlypass_merchent_id"]);
             $currency = trim($_POST["woocommerce_onlypass_currency_type"]);
-            $isLive = trim($_POST["woocommerce_onlypass_isLive"]);
+            $isLive = isset($_POST["woocommerce_onlypass_isLive"])?trim($_POST["woocommerce_onlypass_isLive"]) == 1?"true":"false":"false";
+          
             if(empty($apikey) && empty($merchantId)) {
                 WC_Admin_Settings::add_message(__('Api key and Merchant ID is required' , 'onlypass-payments-woo'));
             }else{
-//                if($isLive == 1)
-//                {
-//                    $baseURL = str_replace("devapi.","api.",$baseURL);
-//                }
-//                echo $baseURL;
-//                die();
-            $response = wp_remote_post($baseURL. "/channels", array(
-                'method' => 'POST',
+            $url = $baseURL. "/channels?isDemo=".$isLive;
+            $response = wp_remote_post($url, array(
+                'method' => 'GET',
                 'timeout' => 45,
                 'redirection' => 5,
                 'httpversion' => '1.0',
@@ -80,35 +77,31 @@ class WC_Gateway_OnlyPass extends WC_Payment_Gateway {
                 }
             } else
             {
-//                echo $body = $response['body'];
-
+               $body = $response['body'];
+            //    die();
                 $json_values = json_decode($response['body'], true);
                 if (!$json_values["status"]) {
                     $this->update_option('api_key','');
                     $this->update_option('merchent_id','');
                     $this->update_option('onlypass_currency_type','');
                     $this->update_option('onlypass_gateways','');
-                    $this->update_option('onlypass_isLive',false);
+                    $this->update_option('onlypass_isLive',"false");
                     WC_Admin_Settings::add_message(__(esc_html__($json_values["message"] , 'onlypass-payments-woo')));
                 } else {
                   $gateways = bin2hex(json_encode($json_values["data"]));
-                  if(api_key == null)
+                  if($apikey == null)
                   {
                       $this->add_option('onlypass_api_key',$apikey);
                       $this->add_option('onlypass_merchent_id',$merchantId);
                       $this->add_option('onlypass_gateways',$gateways);
                       $this->add_option('onlypass_currency_type',$currency);
-                      $this->add_option('onlypass_isLive',$isLive);
-//                      if($isLive == 1)
-//                      {
-//                          $baseURL = str_replace("devapi.","api.",$baseURL);
-//                      }
+                      $this->add_option('onlypass_isLive',$isLive == "true"?1:0);
                   }else{
                       $this->update_option('onlypass_api_key',$apikey);
                       $this->update_option('onlypass_merchent_id',$merchantId);
                       $this->update_option('onlypass_gateways',$gateways);
                       $this->update_option('onlypass_currency_type',$currency);
-                      $this->update_option('onlypass_isLive',$isLive);
+                      $this->update_option('onlypass_isLive',$isLive == "true"?1:0);
                   }
 
         add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
@@ -126,9 +119,10 @@ class WC_Gateway_OnlyPass extends WC_Payment_Gateway {
                 }
             }
         }
-        }else if(isset($apikey) && $apikey != null && $merchantId != null){
-            $response = wp_remote_post($baseURL. "/channels", array(
-                'method' => 'POST',
+        }else if(isset($apikey) && $apikey != null && $merchantId != null && $gateways != null){
+            $url = $baseURL. "/channels?isDemo=".($isLive?"true":"false");
+            $response = wp_remote_post($url, array(
+                'method' => 'GET',
                 'timeout' => 45,
                 'redirection' => 5,
                 'httpversion' => '1.0',
@@ -138,13 +132,16 @@ class WC_Gateway_OnlyPass extends WC_Payment_Gateway {
                 'cookies' => array()
             ));
             if (!is_wp_error($response)){
-//                echo $body = $response['body'];
+            $body = $response['body'];
             $json_values = json_decode($response['body'], true);
+            if($json_values["status"])
+            {
             $gateways = bin2hex(json_encode($json_values["data"]));
             }
-//            die();
+            }
+          
         }
-
+        
     }
 
 
@@ -165,6 +162,7 @@ class WC_Gateway_OnlyPass extends WC_Payment_Gateway {
      * Initialise Gateway Settings Form Fields.
      */
     public function init_form_fields() {
+        
         $this->form_fields = array(
             'enabled'            => array(
                 'title'       => __( 'Enable/Disable', 'onlypass-payments-woo' ),
@@ -205,7 +203,7 @@ class WC_Gateway_OnlyPass extends WC_Payment_Gateway {
                 'label'   => __( 'Enable go live', 'onlypass-payments-woo' ),
                 'type'    => 'checkbox',
                 'description' => __( 'Click here to toggle between live and demo', 'onlypass-payments-woo' ),
-                'default' => 'no',
+                'default' => false,
                 'desc_tip'    => true
             )
         );
@@ -225,7 +223,7 @@ class WC_Gateway_OnlyPass extends WC_Payment_Gateway {
             $needs_shipping = true;
         } elseif ( is_page( wc_get_page_id( 'checkout' ) ) && 0 < get_query_var( 'order-pay' ) ) {
             $order_id = absint( get_query_var( 'order-pay' ) );
-            $order    = wc_get_order( $order_id );
+            $order = wc_get_order( $order_id );
 
             // Test if order needs shipping.
             if ( 0 < count( $order->get_items() ) ) {
@@ -240,9 +238,9 @@ class WC_Gateway_OnlyPass extends WC_Payment_Gateway {
         }
 
         $needs_shipping = apply_filters( 'woocommerce_cart_needs_shipping', $needs_shipping );
-
+            // var_dump($this);
         // Virtual order, with virtual disabled.
-        if ( ! $this->enable_for_virtual && ! $needs_shipping ) {
+        if (!isset($this->enable_for_virtual) && ! $needs_shipping ) {
             return false;
         }
 
