@@ -45,7 +45,7 @@ foreach ($list as $k=>$v) {
       <td>'.$v["amount"].'</td>
     </tr>';
 }
-    echo '</tbody>
+echo '</tbody>
 </table>
 </div>';
 

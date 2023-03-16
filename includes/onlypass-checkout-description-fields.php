@@ -38,9 +38,9 @@ function onlypass_description_fields( $description, $payment_id ) {
         //  echo "SESSION ".$_SESSION["payInit"];
         $isDemo = get_option('onlypass_merchent_id');
         if(isset($gateways) && strlen($gateways) != 0 && 'onlypass' == $payment_id ) {
-         $r = hex2bin($gateways);
-        // var_dump($gateways);
-// return;
+        $r = hex2bin($gateways);
+        // var_dump($r);
+        // return;
          $total = intval($woocommerce->cart->total);
          echo '<style>.woocommerce-error{display: none;}</style>';
          echo '<div class="card" style="display: inline-flex; width:279px; height:auto;padding:10px;">
@@ -83,6 +83,10 @@ echo '<div>
                     channels_count += 1;
                 })
                 if(String(obj.gateway.name).toLowerCase() === "paystack")
+                {
+                    sz = "cover";
+                }
+                if(String(obj.gateway.name).toLowerCase() === "flutterwave")
                 {
                     sz = "cover";
                 }

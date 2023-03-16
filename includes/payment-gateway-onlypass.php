@@ -1,20 +1,16 @@
 <?php
-
-/**
- * OnlyPass Payments Gateway.
- *
- * Provides a OnlyPass Payments Payment Gateway.
- *
- * @class       WC_Gateway_OnlyPass
- * @extends     WC_Payment_Gateway
- * @version     2.1.0
- * @package     WooCommerce/Classes/Payment
+ /**
+ * OnlyPass  Payments Gateway.
+ * Provides  OnlyPass Payments Payment Gateway.
+ * @class    WC_Gateway_OnlyPass
+ * @extends  WC_Payment_Gateway
+ * @version  2.1.0
+ * @package  WooCommerce/Classes/Payment
  */
 class WC_Gateway_OnlyPass extends WC_Payment_Gateway {
     public function __construct() {
         // Setup general properties.
         $this->setup_properties();
-
         // Load the settings.
         $this->init_form_fields();
         $this->init_settings();
@@ -28,38 +24,24 @@ class WC_Gateway_OnlyPass extends WC_Payment_Gateway {
         global $currency;
         global $isLive;
         global $baseURL;
-        $env = "live";
+        $env = "test";
         $apikey = $this->get_option('api_key');
         $merchantId = $this->get_option('merchent_id');
         $gateways =  $this->get_option('onlypass_gateways');
         $currency =  $this->get_option('onlypass_currency_type');
         $isLive =  $this->get_option('onlypass_isLive');
         $baseURL = "https://".($env == "test"?"devapi":"api").".onlypassafrica.com/api/v1/external/payments";
-//        echo ;
-        if($env == "test")
-        {
-            $baseURL = str_replace("api.","devapi.",$baseURL);
-        }
+//      
         if(empty($currency))
         {
-            $currency = "NGN";
+         $currency = "NGN";
         }
-        if((isset($_POST["woocommerce_onlypass_api_key"]) && empty($_POST["woocommerce_onlypass_api_key"])) || (isset($_POST["woocommerce_onlypass_merchent_id"]) && empty($_POST["woocommerce_onlypass_merchent_id"]))) {
-            if($apikey !== null) {
-                $this->update_option('api_key', '');
-                $this->update_option('merchent_id', '');
-                $this->update_option('onlypass_currency_type', '');
-                $this->update_option('onlypass_gateways', 'NGN');
-            }
-        }elseif(isset($_POST["woocommerce_onlypass_api_key"]) && isset($_POST["woocommerce_onlypass_merchent_id"])) {
+        
+        if(isset($_POST["woocommerce_onlypass_api_key"]) && isset($_POST["woocommerce_onlypass_merchent_id"])) {
             $apikey = trim($_POST["woocommerce_onlypass_api_key"]);
             $merchantId = trim($_POST["woocommerce_onlypass_merchent_id"]);
             $currency = trim($_POST["woocommerce_onlypass_currency_type"]);
             $isLive = isset($_POST["woocommerce_onlypass_isLive"])?trim($_POST["woocommerce_onlypass_isLive"]) == 1?"true":"false":"false";
-          
-            if(empty($apikey) && empty($merchantId)) {
-                WC_Admin_Settings::add_message(__('Api key and Merchant ID is required' , 'onlypass-payments-woo'));
-            }else{
             $url = $baseURL. "/channels?isDemo=".$isLive;
             $response = wp_remote_post($url, array(
                 'method' => 'GET',
@@ -71,23 +53,24 @@ class WC_Gateway_OnlyPass extends WC_Payment_Gateway {
                 'body' => array(),
                 'cookies' => array()
             ));
+            
             if (is_wp_error($response)) {
                 foreach ($response->get_error_messages() as $message) {
 
                 }
-            } else
-            {
-               $body = $response['body'];
-            //    die();
+            }else{
                 $json_values = json_decode($response['body'], true);
+                // var_dump($json_values);
+                // die();
                 if (!$json_values["status"]) {
+                    WC_Admin_Settings::add_message(__(esc_html__($json_values["message"] , 'onlypass-payments-woo')));
                     $this->update_option('api_key','');
                     $this->update_option('merchent_id','');
                     $this->update_option('onlypass_currency_type','');
                     $this->update_option('onlypass_gateways','');
                     $this->update_option('onlypass_isLive',"false");
-                    WC_Admin_Settings::add_message(__(esc_html__($json_values["message"] , 'onlypass-payments-woo')));
                 } else {
+                   WC_Admin_Settings::add_message(__(esc_html__("Merchant account verified successfully.", 'onlypass-payments-woo')));
                   $gateways = bin2hex(json_encode($json_values["data"]));
                   if($apikey == null)
                   {
@@ -118,8 +101,7 @@ class WC_Gateway_OnlyPass extends WC_Payment_Gateway {
         add_action( 'woocommerce_email_before_order_table', array( $this, 'email_instructions' ), 10, 3 );
                 }
             }
-        }
-        }else if(isset($apikey) && $apikey != null && $merchantId != null && $gateways != null){
+        }else if($apikey != null && $merchantId != null && $gateways != null){
             $url = $baseURL. "/channels?isDemo=".($isLive?"true":"false");
             $response = wp_remote_post($url, array(
                 'method' => 'GET',
@@ -141,10 +123,7 @@ class WC_Gateway_OnlyPass extends WC_Payment_Gateway {
             }
           
         }
-        
-    }
-
-
+        }
     protected function setup_properties() {
         $this->id                 = 'onlypass';
 //        $this->icon               = apply_filters('woocommerce_onlypass_icon', plugins_url('../assets/logo.png', __FILE__ ) );
@@ -157,7 +136,6 @@ class WC_Gateway_OnlyPass extends WC_Payment_Gateway {
         $this->isLive = __('Enable live', 'onlypass-payments-woo');
         $this->has_fields  = false;
     }
-
     /**
      * Initialise Gateway Settings Form Fields.
      */
@@ -422,7 +400,6 @@ class WC_Gateway_OnlyPass extends WC_Payment_Gateway {
         global $woocommerce;
         // we need it to get any order detailes
         if(isset($_POST["firstCall"]) && $_POST["firstCall"] == "2") {
-//            var_dump($_POST);
             $order = wc_get_order($order);
             $order->update_status('processing');
 //            $order->payment_complete();
@@ -454,7 +431,7 @@ class WC_Gateway_OnlyPass extends WC_Payment_Gateway {
      * @since  3.1.0
      * @param  string         $status Current order status.
      * @param  int            $order_id Order ID.
-     * @param  WC_Order|false $order Order object.
+     * @param  WC_Order |false $order Order object.
      * @return string
      */
     public function change_payment_complete_order_status( $status, $order_id = 0, $order = false ) {
@@ -477,5 +454,3 @@ class WC_Gateway_OnlyPass extends WC_Payment_Gateway {
         }
     }
 }
-
-

@@ -20,7 +20,23 @@ if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins',
 add_action( 'plugins_loaded', 'onlypass_payment_init', 11 );
 add_filter( 'woocommerce_payment_gateways', 'add_to_payment_gateway');
 add_action('wp_head', 'add_stylesheet_to_head');
-
+add_action('wp_footer', 'add_stylesheet_to_footer');
+function add_stylesheet_to_footer()
+{
+    echo '<div style="display: none;
+    background: white;
+    width: 100%;
+    height: 100%;
+    position: fixed;
+    top: 0px;
+    left: 0px;
+    z-index: 99999;
+    border:0px;
+    outline:0px;" id="onlypass_iframe">
+    <i >Loading payment gateway.. </>
+    </div>
+    ';
+}
 function add_stylesheet_to_head() {
     $path = plugins_url('/assets/js/bani.js?v='.uniqid(), __FILE__ );
 //    echo "<style >.payment_method_onlypass > label{background: #212529 !important;color: transparent !important;display:none !important;} .payment_method_onlypass > label > img {float: left !important;display:none !important;} #payment_method_onlypass{opacity: 0} .payment_method_onlypass > label::before{content:'' !important;} </style>";
@@ -48,6 +64,23 @@ function add_checkout_script (){
     $r = hex2bin($gateways);
     ?>
     <script >
+        window.addEventListener("message",(d)=>{
+        console.log(d);
+        if(d.data.event == "close")
+        {
+         jQuery("#onlypass_iframe").hide();
+        }else if(d.data.event == "success")
+        {
+         Aborted(window.genRef);
+         jQuery("#onlypass_iframe").hide();
+        }else if(d.data.status == "success")
+         {
+           setTimeout(()=>{
+            successCallback(d.data.data.reference);
+           },1000)
+           return;
+         }
+        })
  var url = "https://api.onlypassafrica.com/api/v1/external/payments";
 var $ = jQuery;
 var xhr;
@@ -66,11 +99,11 @@ function ShowError(d)
 {
     const elm = jQuery('<div />');
     elm.css({backgroundColor: "#ffdada",padding: "14px",color: "red",borderRadius: "5px"});
-    elm.html(d);
-    jQuery("#customer_details").prepend(elm);
-     setTimeout(()=>{
-     elm.remove();  
-    },4000)
+    const btn = `<button onclick="jQuery('#onlypass_iframe').fadeOut()" style="padding:0px;border-radius: 20px;height:26px;width:26px;margin:10px;" >x</button>`;
+    elm.html(`${d}${btn}`);
+    const x = jQuery("#onlypass_iframe");
+    x.css({alignItems: "center",justifyContent:"center",display: "flex",backgroundColor:"rgb(44 44 44 / 29%)"});
+    x.html(elm).show();
 }
 function InitializePayment()
 {
@@ -78,9 +111,9 @@ function InitializePayment()
       if(window.genRef == null)
       {
           window.genRef = {extRef:generateRef()};
-          resolve(window.genRef)
+          resolve(window.genRef.extRef)
       }else{
-          resolve(window.genRef)
+          resolve(window.genRef.extRef)
       }
   })
 }
@@ -147,7 +180,7 @@ function InitializePayment()
                    }else if(formObj.payment_gateway_list == undefined) {
                     ShowError("Oops! select one of payment gateways from OnyPass gateway list.");
                     }else if(formObj.payment_channel == undefined && formObj.gatewayName != "bani") {
-                        ShowError("Oops! select one of payment channel.");
+                     ShowError("Oops! select one of payment channel.");
                    }else{
                            if (formObj.isLive == 1) {
                                formObj.PKey = formObj.payment_gateway_list.livePublicKey;
@@ -169,10 +202,10 @@ function InitializePayment()
                                    }
                                jQuery(".woocommerce-error").hide();
                                InitializePayment().then((ref) => {
-                                const channelObj = convertHexToBinary(formObj.payment_channel);
-                                console.log(formObj,"|",channelObj);
+
+                               window.channelObj = convertHexToBinary(formObj.payment_channel);
                                 var settings = {
-                                       "url": url,
+                                       "url": `${url}`,
                                        "method": "POST",
                                        "timeout": 0,
                                        "headers": {
@@ -183,7 +216,7 @@ function InitializePayment()
                                        },
                                        "data": JSON.stringify({
                                            "gatewayId": parseInt(formObj.gatewayId),
-                                           "externalReference": `${ref.extRef}`,
+                                           "externalReference":`${ref}`,
                                            "amount": parseFloat(formObj.totalAmount),
                                            "isDemo": formObj.isLive == 1 ? false : true,
                                            "channelIdentifier":channelObj.channelIdentifier,
@@ -191,16 +224,21 @@ function InitializePayment()
                                            "userEmail":formObj.billing_email
                                        })
                                    };
-
+                                   let ifm = jQuery("#onlypass_iframe");
                                 //    return ;
                                    if (window.genRef.call == undefined) {
-                                       jQuery.ajax(settings).done(function (res) {
+                                       jQuery.ajax(settings).done(function (resp) {
                                            // return;
-                                          console.log(res);
-                                           if (res.status) {
-                                               window.genRef = Object.assign(res.data, window.genRef, {call: 1}, formObj);
+                                           if (resp.status) {
+                                               window.genRef = Object.assign(resp.data, window.genRef, {call: 1}, formObj);
                                                formObj = window.genRef;
-                                               CallGateways(formObj);
+                                               if(String(window.genRef.securePaymentUrl).includes("http"))
+                                               {
+                                                ifm.html(`<iframe src="${window.genRef.securePaymentUrl}" style="height:100%;width:100%;border:0px;"></iframe>`);
+                                                ifm.show();
+                                               }else{
+                                                CallGateways(formObj);
+                                               }
                                            }else{
                                             ShowError(res.message);
                                            }
@@ -209,7 +247,13 @@ function InitializePayment()
                                        });
                                    } else {
                                        formObj = Object.assign(window.genRef, formObj);
+                                       if(String(formObj.securePaymentUrl).includes("http"))
+                                       {
+                                        ifm.html(`<iframe src="${window.genRef.securePaymentUrl}" style="height:100%;width:100%;border:0px;"></iframe>`);
+                                        ifm.show();
+                                    }else{
                                        CallGateways(formObj);
+                                       }
                                    }
                                })
                            } else if (formObj.firstCall == 2) {
@@ -263,14 +307,11 @@ function Aborted(formObj = {}) {
 }
 function CallGateways(formObj)
 {
-    // console.log("formObj:",formObj);
-    // console.log("genRef:",window.genRef);
-    // return ;
     if (String(formObj.gatewayName).toLowerCase().includes("paystack")) {
         jQuery("#firstCall").val("3")
       const x = {
           channels:[`${formObj.payment_channel}`],
-          key: `${formObj.PKey}`, // Replace with your public key
+          key: `${window.channelObj?window.channelObj.credentials[0].value:null}`, // Replace with your public key
           email: `${formObj.billing_email}`,
           amount: parseFloat(formObj.amountToPay) * 100,
           currency: `${formObj.currencyType}`,
@@ -285,7 +326,7 @@ function CallGateways(formObj)
               //    console.log(res)
               // })
               successCallback(response.reference)
-
+           console.log("response:",response);
           }
       }
         // console.log("PaystackPop:",x);
@@ -294,7 +335,7 @@ function CallGateways(formObj)
     } else if (String(formObj.gatewayName).toLowerCase().includes("flutterwave")) {
         jQuery("#firstCall").val("3")
         window.FlutterwaveCheckout({
-            public_key: `${formObj.PKey}`,
+            public_key: `${window.channelObj?window.channelObj.credentials[0].value:null}`,
             tx_ref: `${formObj.onlyPassReference}`,
             amount:parseFloat(formObj.amountToPay),
             currency: `${formObj.currencyType}`,
@@ -320,7 +361,7 @@ function CallGateways(formObj)
             onClose: () =>Aborted(formObj),
             onLoad: () => {},
             onSuccess: (response) =>successCallback(response),
-            key: `${formObj.PKey}`,
+            key: `${window.channelObj?window.channelObj.credentials[0].value:null}`,
             email:`${formObj.billing_email}`,
             amount:parseFloat(formObj.amountToPay) * 100,
             currency_code: `${formObj.currencyType}`,
@@ -333,26 +374,27 @@ function CallGateways(formObj)
             squadInstance.setup();
             squadInstance.open();
     }else if (String(formObj.gatewayName).toLowerCase().includes("bani")) {
-
+console.log("bani:",formObj);
         const bsni  = {
             amount:formObj.amountToPay,
             phoneNumber:formObj.billing_phone,
             email:`${formObj.billing_email}`,
             firstName:`${formObj.billing_first_name}`,
             lastName:`${formObj.billing_last_name}`,
-            merchantKey:`${formObj.PKey}`,
+            merchantKey:`${window.channelObj?window.channelObj.credentials[0].value:null}`,
             merchantRef:`${formObj.onlyPassReference}`,
             metadata: "",
             onClose: (response) => {
                 Aborted(formObj);
+                
             },
             callback: function (response) {
                 successCallback(response);
             }
         }
-        // console.log("bani:",bsni);
-        let handler = BaniPopUp(bsni);
-        handler
+        console.log("bani:",bsni);
+        BaniPopUp(bsni);
+        // handler
     }
 }
 function update_shipping()
